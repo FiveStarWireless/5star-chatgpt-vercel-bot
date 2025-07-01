@@ -1,7 +1,12 @@
 export default async function handler(req, res) {
-  const { prompt } = req.body;
-
   try {
+    const body = req.method === "POST" ? await req.json() : {};
+    const { prompt } = body;
+
+    if (!prompt) {
+      return res.status(400).json({ reply: "Missing prompt." });
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -11,15 +16,15 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: "You are a helpful AI for 5Star Wireless." },
+          { role: "system", content: "You are a helpful AI assistant for 5Star Wireless." },
           { role: "user", content: prompt }
         ]
-      })
+      }),
     });
 
     const data = await response.json();
-    res.status(200).json({ reply: data.choices[0].message.content });
+    return res.status(200).json({ reply: data.choices[0].message.content });
   } catch (err) {
-    res.status(500).json({ reply: "Error: " + err.message });
+    return res.status(500).json({ reply: "Server error: " + err.message });
   }
 }
