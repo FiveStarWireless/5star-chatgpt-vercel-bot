@@ -1,32 +1,30 @@
-// pages/api/products.js
 export default async function handler(req, res) {
   try {
     const shopDomain = process.env.SHOPIFY_STORE_DOMAIN;
     const storefrontToken = process.env.SHOPIFY_STOREFRONT_TOKEN;
 
+    let products = [];
     let hasNextPage = true;
     let endCursor = null;
-    const allProducts = [];
 
     while (hasNextPage) {
       const query = `
         query {
-          products(first: 50${endCursor ? `, after: \"${endCursor}\"` : ""}) {
-            pageInfo {
-              hasNextPage
-            }
+          products(first: 100, ${endCursor ? `after: "${endCursor}"` : ""}) {
             edges {
-              cursor
               node {
-                id
                 title
-                description
                 handle
+                description
                 featuredImage {
                   url
                   altText
                 }
               }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
             }
           }
         }
@@ -43,15 +41,22 @@ export default async function handler(req, res) {
 
       const data = await response.json();
 
-      const edges = data?.data?.products?.edges || [];
-      edges.forEach(edge => allProducts.push(edge.node));
+      if (!data || !data.data || !data.data.products) {
+        throw new Error("Shopify response does not contain products.");
+      }
 
-      hasNextPage = data?.data?.products?.pageInfo?.hasNextPage;
-      endCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+      const edges = data.data.products.edges;
+      products = products.concat(edges.map(edge => edge.node));
+
+      hasNextPage = data.data.products.pageInfo.hasNextPage;
+      endCursor = edges.length ? edges[edges.length - 1].cursor : null;
     }
 
-    res.status(200).json({ products: allProducts });
+    res.status(200).json({ products });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch products", details: err.message });
+    res.status(500).json({
+      error: "Failed to fetch products",
+      details: err.message,
+    });
   }
 }
