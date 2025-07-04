@@ -20,6 +20,16 @@ export default async function handler(req, res) {
                   url
                   altText
                 }
+                variants(first: 1) {
+                  edges {
+                    node {
+                      price {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
               }
               cursor
             }
@@ -46,7 +56,17 @@ export default async function handler(req, res) {
       }
 
       const edges = data.data.products.edges;
-      products = products.concat(edges.map(edge => edge.node));
+
+      products = products.concat(edges.map(edge => {
+        const variant = edge.node.variants.edges[0]?.node;
+        return {
+          title: edge.node.title,
+          handle: edge.node.handle,
+          description: edge.node.description,
+          image: edge.node.featuredImage?.url || "",
+          price: variant ? `${variant.price.amount} ${variant.price.currencyCode}` : "Price not available"
+        };
+      }));
 
       hasNextPage = data.data.products.pageInfo.hasNextPage;
       endCursor = edges.length ? edges[edges.length - 1].cursor : null;

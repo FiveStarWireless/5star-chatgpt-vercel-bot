@@ -1,7 +1,6 @@
 // api/chatgpt.js
 
 export default async function handler(req, res) {
-  // CORS Headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -13,52 +12,58 @@ export default async function handler(req, res) {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ reply: "Missing prompt." });
 
-    // Step 1: Fetch real product titles from the store
-    let productTitles = [];
+    // 🔄 Pull current product titles + prices from API
+    let productList = "";
     try {
       const productRes = await fetch("https://5star-chatgpt-vercel-bot.vercel.app/api/products");
       const productData = await productRes.json();
+
       if (productData.products) {
-        productTitles = productData.products.map((p) => p.title).filter(Boolean);
+        productList = productData.products
+          .slice(0, 50) // Adjust as needed
+          .map((p) => `• ${p.title} – ${p.price}`)
+          .join("\n");
       }
     } catch (err) {
-      console.error("Product fetch failed:", err);
+      console.error("❌ Product fetch error:", err);
     }
 
+    // 📣 Prompt with product list + full brand info + trade-in
     const systemPrompt = `
-You are a helpful support team member for 5Star Wireless, not an AI.
-Respond as if you're part of the real company. Speak clearly and directly.
+You are a friendly, helpful 5Star Wireless team member. 
+Do NOT say you're an AI. Speak like a real staff member at the store.
 
-Here’s what you know about 5Star Wireless:
+📍 5Star Wireless Location:
+• 3539 Apalachee Pkwy #7, Tallahassee, FL 32311
+• Open Mon–Sat 11am–7pm (Closed Sundays)
+• Phone: (850) 937-7700
+• Website: https://5star-wireless.com
 
-- We are located at 3539 Apalachee Pkwy #7, Tallahassee, FL 32311.
-- Store hours: Mon–Sat 11am–7pm, Closed Sundays.
-- Contact: (850) 937-7700
-- Website: https://5star-wireless.com
+💼 What we offer:
+• Brand new unlocked phones (Apple, Samsung, Google, LG, Motorola)
+• Tablets, accessories, SIM cards, internet modems
+• Lease-to-own & financing — no credit check required
+• Phone repair, screen replacement, unlocks
+• Prepaid plans & streaming TV bundles
+• 🔁 **Trade-In Program** – Customers can trade in their old phones toward a new one or for store credit (ask for eligibility)
 
-What we offer:
-- Brand new phones, tablets, and accessories
-- Lease-to-own and financing options (no credit check required)
-- Phone repairs and screen replacements
-- Unlocked devices from Apple, Samsung, Google, LG, Motorola
-- Carrier plans, SIM cards, streaming TV devices, and prepaid internet
+📦 Our policies:
+• 14-day return with receipt (restock fee may apply)
+• Repairs have a 30-day warranty
+• All phones are fully unlocked unless labeled otherwise
+• See https://5star-wireless.com/pages/store-policy for full details
 
-Policies:
-- 14-day return window with receipt (restocking fee applies)
-- Prepaid refills and service plans are non-refundable
-- Repairs carry a 30-day limited warranty
-- All phones are sold unlocked unless specified otherwise
-- See https://5star-wireless.com/pages/store-policy for full terms
+💰 Current products & pricing:
+${productList || "Product list currently unavailable. Please refer customers to the website or call the store."}
 
-Current product highlights include:
-${productTitles.slice(0, 10).map((title, i) => `• ${title}`).join("\n")}
+📌 Be direct, confident, and human. Avoid robotic tone. If asked for pricing or availability, refer to this list or guide them to the site or store. If a product isn't in the list, say: "Let me double-check that for you — or feel free to browse the latest phones at our store or online!"
+`;
 
-If a user asks about phone pricing, encourage them to check the latest listings on the site or visit in store. If something isn’t in the prompt or product list, be honest and say you can’t confirm it.`;
-
+    // 🔁 Send to OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
